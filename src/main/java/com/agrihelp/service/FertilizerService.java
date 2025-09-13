@@ -1,98 +1,71 @@
 package com.agrihelp.service;
 
-import com.agrihelp.model.Fertilizer;
-import com.agrihelp.model.SHC;
+import com.agrihelp.model.FertilizerRecommendation;
 import com.agrihelp.model.SoilData;
-import com.agrihelp.repository.FertilizerRepository;
-import com.agrihelp.repository.SHCRepository;
-import com.agrihelp.repository.SoilRepository;
+import com.agrihelp.repository.FertilizerRecommendationRepository;
+import com.agrihelp.repository.SoilDataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
 public class FertilizerService {
 
     @Autowired
-    private FertilizerRepository fertilizerRepository;
+    private FertilizerRecommendationRepository fertilizerRepository;
 
     @Autowired
-    private SoilRepository soilRepository;
-
-    @Autowired
-    private SHCRepository shcRepository;
+    private SoilDataRepository soilDataRepository;
 
     /**
-     * Suggest fertilizers based on SHC (preferred) or fallback to SoilData.
+     * Save fertilizer recommendation (admin/extension officer use)
      */
-    public List<Fertilizer> suggestFertilizers(String userId, String soilId, String cropType) {
-        Double nitrogen = null, phosphorus = null, potassium = null;
-
-        // ✅ 1. Try SHC first
-        Optional<SHC> shcOpt = shcRepository.findByUserId(userId);
-        if (shcOpt.isPresent()) {
-            SHC shc = shcOpt.get();
-            nitrogen = shc.getNitrogen();
-            phosphorus = shc.getPhosphorus();
-            potassium = shc.getPotassium();
-        } else if (soilId != null) {
-            // ✅ 2. Fallback: use soil data
-            SoilData soil = soilRepository.findById(soilId).orElse(null);
-            if (soil != null) {
-                nitrogen = soil.getNitrogen();
-                phosphorus = soil.getPhosphorus();
-                potassium = soil.getPotassium();
-            }
-        }
-
-        // ✅ 3. If no data, return empty list
-        if (nitrogen == null && phosphorus == null && potassium == null) {
-            return new ArrayList<>();
-        }
-
-        // ✅ 4. Query repository by nutrient gaps + cropType
-        List<Fertilizer> suggestions = new ArrayList<>();
-        for (Fertilizer fert : fertilizerRepository.findByCropType(cropType)) {
-            boolean needsN = nitrogen != null && nitrogen < fert.getRecommendedN();
-            boolean needsP = phosphorus != null && phosphorus < fert.getRecommendedP();
-            boolean needsK = potassium != null && potassium < fert.getRecommendedK();
-
-            if (needsN || needsP || needsK) {
-                suggestions.add(fert);
-            }
-        }
-
-        return suggestions;
+    public FertilizerRecommendation saveRecommendation(FertilizerRecommendation recommendation) {
+        return fertilizerRepository.save(recommendation);
     }
 
     /**
-     * Get fertilizer recommendation for crop & soil type (simple sustainability info).
+     * Get fertilizer recommendations for a crop (without soil data)
      */
-    public Map<String, Object> getFertilizerRecommendation(String cropName, String soilType) {
-        Map<String, Object> recommendation = new HashMap<>();
+    public List<FertilizerRecommendation> getGeneralRecommendations(String cropName) {
+        return fertilizerRepository.findByCropNameIgnoreCase(cropName);
+    }
 
-        List<Fertilizer> fertilizers = new ArrayList<>();
-        for (Fertilizer fert : fertilizerRepository.findByCropType(cropName)) {
-            if (fert.getSoilType().equalsIgnoreCase(soilType)) {
-                fertilizers.add(fert);
-            }
+    /**
+     * Get fertilizer recommendation based on crop + soil data (accurate mode)
+     */
+    public FertilizerRecommendation getFertilizerWithSoilData(String cropName, String fieldName) {
+        Optional<SoilData> soilOpt = soilDataRepository.findByFieldNameIgnoreCase(fieldName);
+
+        if (soilOpt.isEmpty()) {
+            List<FertilizerRecommendation> general = fertilizerRepository.findByCropNameIgnoreCase(cropName);
+            return general.isEmpty() ? null : general.get(0);
         }
 
-        if (!fertilizers.isEmpty()) {
-            Fertilizer fert = fertilizers.get(0); // pick first match
-            recommendation.put("fertilizer", fert.getName());
-            recommendation.put("N", fert.getRecommendedN());
-            recommendation.put("P", fert.getRecommendedP());
-            recommendation.put("K", fert.getRecommendedK());
-        } else {
-            recommendation.put("fertilizer", "N/A");
-        }
+        SoilData soil = soilOpt.get();
 
-        return recommendation;
+        String notes = "";
+        if (soil.getNitrogen() < 200) notes += "Nitrogen is low; use Urea/DAP.\n";
+        if (soil.getPhosphorus() < 20) notes += "Phosphorus is low; add SSP/DAP.\n";
+        if (soil.getPotassium() < 150) notes += "Potassium is low; add MOP.\n";
+        if (soil.getPh() < 5.5) notes += "Soil is acidic; apply lime.\n";
+        if (soil.getPh() > 8.0) notes += "Soil is alkaline; use gypsum.\n";
+
+        return FertilizerRecommendation.builder()
+                .cropName(cropName) // match model field
+                .soilType(soil.getSoilType())
+                .recommendation(notes.isEmpty() ? "Balanced nutrients" : notes)
+                .whatToLookFor("Soil nutrient status")
+                .safetyNotes("Apply according to recommended dosage")
+                .build();
+    }
+
+    /**
+     * Get all fertilizer recommendations (admin view)
+     */
+    public List<FertilizerRecommendation> getAllRecommendations() {
+        return fertilizerRepository.findAll();
     }
 }

@@ -1,42 +1,42 @@
 package com.agrihelp.model;
 
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * MarketPrice model represents daily crop price data
+ * stored in MongoDB with cache timestamps.
+ */
 @Document(collection = "market_prices")
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class MarketPrice {
 
     @Id
     private String id;
-    private String commodity;
-    private String market;
-    private double price;
-    private LocalDateTime timestamp;
 
-    public MarketPrice() {}
+    private String cropName;    // Commodity name (e.g., "Wheat", "Rice")
+    private String location;    // State or district
+    private String marketName;  // Specific mandi/market (e.g., "Delhi Azadpur Mandi")
 
-    public MarketPrice(String commodity, String market, double price, LocalDateTime timestamp) {
-        this.commodity = commodity;
-        this.market = market;
-        this.price = price;
-        this.timestamp = timestamp;
-    }
+    private double price;       // Price value
+    private String unit;        // e.g., "quintal", "kg"
 
-    // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    private LocalDate priceDate;      // Date when this price is valid (from API)
+    
+    @CreatedDate
+    private LocalDateTime createdAt;  // Timestamp when saved in DB
 
-    public String getCommodity() { return commodity; }
-    public void setCommodity(String commodity) { this.commodity = commodity; }
+    @LastModifiedDate
+    private LocalDateTime updatedAt;  // Timestamp when record was last modified
 
-    public String getMarket() { return market; }
-    public void setMarket(String market) { this.market = market; }
-
-    public double getPrice() { return price; }
-    public void setPrice(double price) { this.price = price; }
-
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+    private LocalDateTime lastUpdated; // Useful for cache validity checks (API fetch time)
 }

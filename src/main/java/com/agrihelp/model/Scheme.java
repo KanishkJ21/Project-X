@@ -1,43 +1,35 @@
 package com.agrihelp.model;
 
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Document(collection = "schemes")
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class Scheme {
+
+    @Id
+    private String id;
 
     private String name;
     private String description;
-    private double amount;
+    private String eligibility;
+    private String benefits;
+    private String region;       // Added field for region-specific queries
+    private boolean isActive;    // Added field to track active/inactive schemes
+    private LocalDate lastUpdated; // Scheme-specific update
 
-    // Default constructor
-    public Scheme() {}
+    @CreatedDate
+    private LocalDateTime createdAt;
 
-    // Parameterized constructor
-    public Scheme(String name, String description, double amount) {
-        this.name = name;
-        this.description = description;
-        this.amount = amount;
-    }
-
-    // Getters and Setters
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public double getAmount() {
-        return amount;
-    }
-
-    public void setAmount(double amount) {
-        this.amount = amount;
-    }
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
 }

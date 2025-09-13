@@ -9,59 +9,41 @@ public class User {
     @Id
     private String id;
 
-    private String name;
+    private String username;
     private String email;
-    private String phoneNumber;
-    private String aadhaarNumber;
-    private String password;
+    private String password; // Store hashed password
 
-    // New fields for SHC regional support
-    private String state;
-    private String district;
+    // Optional: user role (farmer, admin) — Spring Security requires ROLE_ prefix
+    private String role = "ROLE_FARMER";
 
-    // New field for tracking SHC skip option
-    private boolean shcSkipped = false;
-
-    // Constructors
     public User() {}
 
-    public User(String name, String email, String phoneNumber, String aadhaarNumber,
-                String password, String state, String district, boolean shcSkipped) {
-        this.name = name;
+    public User(String username, String email, String password) {
+        this.username = username;
         this.email = email;
-        this.phoneNumber = phoneNumber;
-        this.aadhaarNumber = aadhaarNumber;
         this.password = password;
-        this.state = state;
-        this.district = district;
-        this.shcSkipped = shcSkipped;
     }
 
-    // Getters and Setters
+    // Getters & Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getPhoneNumber() { return phoneNumber; }
-    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
-
-    public String getAadhaarNumber() { return aadhaarNumber; }
-    public void setAadhaarNumber(String aadhaarNumber) { this.aadhaarNumber = aadhaarNumber; }
-
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
-    public String getState() { return state; }
-    public void setState(String state) { this.state = state; }
-
-    public String getDistrict() { return district; }
-    public void setDistrict(String district) { this.district = district; }
-
-    public boolean isShcSkipped() { return shcSkipped; }
-    public void setShcSkipped(boolean shcSkipped) { this.shcSkipped = shcSkipped; }
+    public String getRole() { return role; }
+    public void setRole(String role) { 
+        // Ensure prefix "ROLE_" for Spring Security
+        if (!role.startsWith("ROLE_")) {
+            this.role = "ROLE_" + role;
+        } else {
+            this.role = role;
+        }
+    }
 }

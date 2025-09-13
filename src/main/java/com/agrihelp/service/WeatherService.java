@@ -1,69 +1,86 @@
 package com.agrihelp.service;
 
+import com.agrihelp.model.MainData;
+import com.agrihelp.model.WeatherCondition;
+import com.agrihelp.model.WeatherData;
+import com.agrihelp.repository.WeatherDataRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 
 @Service
 public class WeatherService {
 
-    private final String API_KEY = "YOUR_API_KEY";
+    @Autowired
+    private WeatherDataRepository weatherDataRepository;
+
+    private final String API_KEY = "YOUR_API_KEY";  // Replace with your API key
     private final String BASE_URL = "https://api.openweathermap.org/data/2.5/weather?q={city}&appid={apiKey}&units=metric";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Generic method to fetch weather data as Map for any feature
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> getWeatherByCity(String city) {
-        Map<String, String> uriVariables = new HashMap<>();
-        uriVariables.put("city", city);
-        uriVariables.put("apiKey", API_KEY);
+    public WeatherData getWeatherByCity(String city) {
+        // 1. Check cached weather in DB
+        Optional<WeatherData> cachedWeather = weatherDataRepository.findByCityIgnoreCase(city);
 
-        Map<String, Object> response = restTemplate.getForObject(BASE_URL, Map.class, uriVariables);
+        if (cachedWeather.isPresent()) {
+            WeatherData weather = cachedWeather.get();
 
-        // Returning only required parts to features
-        Map<String, Object> weatherData = new HashMap<>();
-        if (response != null) {
-            Map<String, Object> main = (Map<String, Object>) response.get("main");
-            Map<String, Object> wind = (Map<String, Object>) response.get("wind");
-
-            weatherData.put("temperature", main.get("temp"));
-            weatherData.put("humidity", main.get("humidity"));
-            weatherData.put("windSpeed", wind.get("speed"));
-            weatherData.put("city", response.get("name"));
-
-            // If rainfall info exists
-            Map<String, Object> rain = (Map<String, Object>) response.get("rain");
-            if (rain != null && rain.containsKey("1h")) {
-                weatherData.put("rainfall", rain.get("1h"));
-            } else {
-                weatherData.put("rainfall", 0);
+            // Cache is valid for 30 minutes
+            if (weather.getLastUpdated() != null &&
+                weather.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(30))) {
+                return weather;
             }
         }
 
-        return weatherData;
-    }
+        // 2. Fetch from API
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            // Fetch raw JSON as String
+            String jsonResponse = restTemplate.getForObject(BASE_URL, String.class, city, API_KEY);
 
-    // Feature-specific helper for Crop
-    public Map<String, Object> getWeatherForCrop(String city) {
-        Map<String, Object> data = getWeatherByCity(city);
-        Map<String, Object> cropWeather = new HashMap<>();
-        cropWeather.put("temperature", data.get("temperature"));
-        cropWeather.put("humidity", data.get("humidity"));
-        cropWeather.put("city", data.get("city"));
-        return cropWeather;
-    }
+            // Convert JSON string to Map
+            Map<String, Object> response = objectMapper.readValue(jsonResponse,
+                    new TypeReference<Map<String, Object>>() {});
 
-    // Feature-specific helper for Irrigation
-    public Map<String, Object> getWeatherForIrrigation(String city) {
-        Map<String, Object> data = getWeatherByCity(city);
-        Map<String, Object> irrigationWeather = new HashMap<>();
-        irrigationWeather.put("temperature", data.get("temperature"));
-        irrigationWeather.put("humidity", data.get("humidity"));
-        irrigationWeather.put("rainfall", data.get("rainfall"));
-        irrigationWeather.put("city", data.get("city"));
-        return irrigationWeather;
+            // Parse "main" into MainData
+            MainData main = objectMapper.convertValue(response.get("main"), MainData.class);
+            double temperature = main != null ? main.getTemp() : 0.0;
+            double humidity = main != null ? main.getHumidity() : 0.0;
+
+            // Parse "weather" into List<WeatherCondition>
+            List<WeatherCondition> weatherList = objectMapper.convertValue(
+                    response.get("weather"), new TypeReference<List<WeatherCondition>>() {}
+            );
+            String condition = (weatherList != null && !weatherList.isEmpty())
+                    ? weatherList.get(0).getMain()
+                    : "Unknown";
+
+            // Build WeatherData
+            WeatherData newWeather = WeatherData.builder()
+                    .city(city)
+                    .temperature(temperature)
+                    .humidity(humidity)
+                    .condition(condition)
+                    .lastUpdated(LocalDateTime.now())
+                    .build();
+
+            weatherDataRepository.save(newWeather); // Save cache
+            return newWeather;
+
+        } catch (Exception e) {
+            // Fallback to cached data if API fails
+            if (cachedWeather.isPresent()) {
+                return cachedWeather.get();
+            }
+            throw new RuntimeException("Unable to fetch weather data for " + city, e);
+        }
     }
 }

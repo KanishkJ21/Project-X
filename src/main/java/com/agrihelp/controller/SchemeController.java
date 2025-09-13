@@ -14,13 +14,15 @@ public class SchemeController {
     @Autowired
     private SchemeService schemeService;
 
-    @GetMapping("/getAll")
-    public List<Scheme> getAllSchemes() {
-        return schemeService.getAllSchemes();
+    // Save a scheme
+    @PostMapping("/save")
+    public Scheme saveScheme(@RequestBody Scheme scheme) {
+        return schemeService.addScheme(scheme);
     }
 
-    @PostMapping("/add")
-    public Scheme addScheme(@RequestBody Scheme scheme) {
-        return schemeService.addScheme(scheme);
+    // Get all schemes
+    @GetMapping("/all")
+    public List<Scheme> getAllSchemes() {
+        return schemeService.getAllSchemes();
     }
 }

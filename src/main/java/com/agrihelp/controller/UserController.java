@@ -2,54 +2,39 @@ package com.agrihelp.controller;
 
 import com.agrihelp.model.User;
 import com.agrihelp.service.UserService;
-import org.springframework.http.ResponseEntity;
+import com.agrihelp.util.JwtUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.Optional;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserService userService;
+    @Autowired
+    private UserService userService;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @PostMapping("/register")
+    public User register(@RequestBody User user) {
+        // Register with encoded password
+        return userService.registerUser(user.getUsername(), user.getEmail(), user.getPassword());
     }
 
-    // Signup
-    @PostMapping("/signup")
-    public ResponseEntity<?> signup(@RequestBody User user) {
-        // Check for existing email, phone, or Aadhaar
-        if (userService.findByEmail(user.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already registered");
-        }
-        if (userService.findByPhoneNumber(user.getPhoneNumber()).isPresent()) {
-            return ResponseEntity.badRequest().body("Phone number already registered");
-        }
-        if (userService.findByAadhaarNumber(user.getAadhaarNumber()).isPresent()) {
-            return ResponseEntity.badRequest().body("Aadhaar number already registered");
-        }
-
-        User createdUser = userService.createUser(user);
-        return ResponseEntity.ok(createdUser);
-    }
-
-    // Login (email, phone, or Aadhaar)
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest) {
-        String identifier = loginRequest.get("identifier"); // email / phone / aadhaar
-        String password = loginRequest.get("password");
+    public Map<String, String> login(@RequestBody User user) {
+        Optional<User> authenticatedUser = userService.authenticate(user.getUsername(), user.getPassword());
 
-        Optional<User> userOpt = userService.findByEmail(identifier);
-        if (userOpt.isEmpty()) userOpt = userService.findByPhoneNumber(identifier);
-        if (userOpt.isEmpty()) userOpt = userService.findByAadhaarNumber(identifier);
-
-        if (userOpt.isPresent() && userService.verifyPassword(password, userOpt.get().getPassword())) {
-            return ResponseEntity.ok("Login successful");
+        if (authenticatedUser.isPresent()) {
+            // Generate JWT for authenticated user
+            String token = jwtUtils.generateToken(authenticatedUser.get().getUsername());
+            return Map.of("message", "Login successful", "token", token);
         } else {
-            return ResponseEntity.status(401).body("Invalid credentials");
+            return Map.of("message", "Invalid credentials");
         }
     }
 }
