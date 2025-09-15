@@ -1,6 +1,6 @@
 package com.agrihelp.controller;
 
-import com.agrihelp.model.MarketPrice;
+import com.agrihelp.model.MarketPriceCache;
 import com.agrihelp.service.MarketPriceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -12,12 +12,24 @@ public class MarketPriceController {
     @Autowired
     private MarketPriceService marketService;
 
-    // Get real-time market prices for a commodity and state/market
+    /**
+     * Get market prices for a commodity in a given state.
+     * Example: GET /api/market/wheat/Delhi
+     */
     @GetMapping("/{commodity}/{state}")
-    public MarketPrice getMarketPrice(
+    public MarketPriceCache getMarketPrice(
             @PathVariable String commodity,
             @PathVariable String state
     ) {
         return marketService.getMarketPrice(commodity, state);
+    }
+
+    /**
+     * Health check endpoint (useful to test API is running).
+     * Example: GET /api/market/ping
+     */
+    @GetMapping("/ping")
+    public String ping() {
+        return "MarketPrice API is running 🚀";
     }
 }
