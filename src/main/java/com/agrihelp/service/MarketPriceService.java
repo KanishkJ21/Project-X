@@ -2,106 +2,103 @@ package com.agrihelp.service;
 
 import com.agrihelp.model.MarketPriceCache;
 import com.agrihelp.repository.MarketPriceCacheRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class MarketPriceService {
 
-    @Autowired
-    private MarketPriceCacheRepository cacheRepository;
+    private final MarketPriceCacheRepository cacheRepository;
+    private final RestTemplate restTemplate;
 
-    @Autowired
-    private RestTemplate restTemplate;
-
-    @Autowired
-    private ApiRetryUtil apiRetryUtil;  // ✅ Retry utility
-
-    private static final String API_URL =
-            "https://api.data.gov.in/resource/YOUR_RESOURCE_ID?api-key=YOUR_API_KEY&format=json&filters[commodity]={commodity}&filters[state]={state}";
+    @Value("${marketplace.api.url}")
+    private String apiUrl;
 
     private static final int CACHE_VALIDITY_MINUTES = 30;
 
-    /**
-     * Get market price for a commodity in a state.
-     * Uses cached data if available (valid for 30 mins), otherwise fetches from API with retries.
-     */
-    public MarketPriceCache getMarketPrice(String commodity, String state) {
-        // 1️⃣ Check cache
-        Optional<MarketPriceCache> cachedState = cacheRepository
-                .findTopByCommodityIgnoreCaseAndStateIgnoreCaseOrderByLastUpdatedDesc(commodity, state);
+    public List<MarketPriceCache> getMarketPrices(String commodity, String state) {
+        List<MarketPriceCache> cached = cacheRepository.findByCommodityIgnoreCaseAndStateIgnoreCase(commodity, state);
 
-        if (cachedState.isPresent() &&
-                cachedState.get().getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(CACHE_VALIDITY_MINUTES))) {
-            return cachedState.get();
+        if (!cached.isEmpty() && cached.stream()
+                .allMatch(c -> c.getLastUpdated() != null &&
+                        c.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(CACHE_VALIDITY_MINUTES)))) {
+            return cached;
         }
 
-        // 2️⃣ Fetch from API with retries
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = apiRetryUtil.getForObjectWithRetry(
-                    restTemplate, API_URL, Map.class, commodity, state);
+            Map<String, Object> response = restTemplate.getForObject(
+                    apiUrl, Map.class, commodity, state
+            );
 
-            MarketPriceCache latestPrice = buildMarketPriceFromResponse(response, commodity, state);
+            List<MarketPriceCache> fresh = parseApiResponse(response, commodity, state);
 
-            if (latestPrice != null) {
-                cacheRepository.save(latestPrice); // ✅ update cache
-                return latestPrice;
+            if (!fresh.isEmpty()) {
+                cacheRepository.saveAll(fresh);
+                return fresh;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        // 3️⃣ Fallback → last cached data or placeholder if API fails
-        return cachedState.orElse(
-                MarketPriceCache.builder()
-                        .commodity(commodity)
-                        .state(state)
-                        .market("Unknown")
-                        .price(0.0)
-                        .unit("quintal")
-                        .priceDate(LocalDate.now())
-                        .lastUpdated(LocalDateTime.now())
-                        .build()
-        );
+        return cached; // fallback
     }
 
-    /**
-     * Build MarketPriceCache object from API response
-     */
-    private MarketPriceCache buildMarketPriceFromResponse(Object response, String commodity, String state) {
-        try {
-            Map<?, ?> map = (Map<?, ?>) response;
-            if (map.containsKey("records")) {
-                List<?> records = (List<?>) map.get("records");
-                if (!records.isEmpty()) {
-                    Map<?, ?> firstRecord = (Map<?, ?>) records.get(0);
+    @SuppressWarnings("unchecked")
+    private List<MarketPriceCache> parseApiResponse(Object response, String commodity, String state) {
+        List<MarketPriceCache> results = new ArrayList<>();
 
-                    double price = Double.parseDouble(firstRecord.get("modal_price").toString());
-                    String marketName = firstRecord.get("market").toString();
-                    String dateStr = firstRecord.get("arrival_date").toString();
+        if (!(response instanceof Map)) return results;
 
-                    return MarketPriceCache.builder()
+        Map<String, Object> map = (Map<String, Object>) response;
+
+        if (map.containsKey("records")) {
+            List<Map<String, Object>> records = (List<Map<String, Object>>) map.get("records");
+
+            for (Map<String, Object> record : records) {
+                try {
+                    MarketPriceCache entry = MarketPriceCache.builder()
                             .commodity(commodity)
                             .state(state)
-                            .market(marketName)
-                            .price(price)
-                            .unit("quintal")
-                            .priceDate(LocalDate.parse(dateStr))
+                            .district(String.valueOf(record.getOrDefault("district", "Unknown")))
+                            .market(String.valueOf(record.getOrDefault("market", "Unknown")))
+                            .variety(String.valueOf(record.getOrDefault("variety", "Unknown")))
+                            .arrivalDate(parseDate(record.get("arrival_date")))
+                            .minPrice(parseDouble(record.get("min_price")))
+                            .maxPrice(parseDouble(record.get("max_price")))
+                            .modalPrice(parseDouble(record.get("modal_price")))
                             .lastUpdated(LocalDateTime.now())
                             .build();
+
+                    results.add(entry);
+                } catch (Exception ignore) {
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        return null;
+
+        return results;
+    }
+
+    private Double parseDouble(Object value) {
+        if (value == null) return 0.0;
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private LocalDate parseDate(Object value) {
+        try {
+            return LocalDate.parse(String.valueOf(value));
+        } catch (Exception e) {
+            return LocalDate.now();
+        }
     }
 }

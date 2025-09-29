@@ -26,6 +26,7 @@ public class WeatherData {
     private double temperature;
     private double humidity;
     private String condition; // Sunny, Rainy, Cloudy
+    private double windSpeed;
 
     @CreatedDate
     private LocalDateTime createdAt;

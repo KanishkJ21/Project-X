@@ -4,31 +4,44 @@ import com.agrihelp.model.SoilData;
 import com.agrihelp.service.SoilDataService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/soil")
+@CrossOrigin(origins = "http://localhost:5173") // ✅ Allow frontend
 public class SoilDataController {
 
     @Autowired
     private SoilDataService soilService;
 
-    // Save soil data
-    @PostMapping("/save")
-    public SoilData saveSoilData(@RequestBody SoilData soilData) {
+    // ✅ Changed mapping from /save to just POST /
+    @PostMapping
+    public SoilData save(@RequestBody SoilData soilData) {
         return soilService.saveSoilData(soilData);
     }
 
-    // Get soil data for a farmer's field
     @GetMapping("/{fieldName}")
-    public SoilData getSoilData(@PathVariable String fieldName) {
-        return soilService.getSoilData(fieldName);
+    public SoilData getByField(@PathVariable String fieldName) {
+        return soilService.getByFieldName(fieldName).orElse(null);
     }
 
-    // Get all soil data (admin)
+    @GetMapping("/region/{region}")
+    public List<SoilData> getByRegion(@PathVariable String region) {
+        return soilService.getByRegion(region);
+    }
+
+    @GetMapping("/user/{userId}")
+    public List<SoilData> getByUser(@PathVariable String userId) {
+        return soilService.getByUser(userId);
+    }
+
     @GetMapping("/all")
-    public List<SoilData> getAllSoilData() {
-        return soilService.getAllSoilData();
+    public List<SoilData> getAll() {
+        return soilService.getAll();
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable String id) {
+        soilService.delete(id);
     }
 }

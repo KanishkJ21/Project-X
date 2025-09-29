@@ -9,10 +9,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * MarketPrice model represents daily crop price data
- * stored in MongoDB with cache timestamps.
- */
 @Document(collection = "market_prices")
 @Data
 @Builder
@@ -23,20 +19,21 @@ public class MarketPrice {
     @Id
     private String id;
 
-    private String cropName;    // Commodity name (e.g., "Wheat", "Rice")
-    private String location;    // State or district
-    private String marketName;  // Specific mandi/market (e.g., "Delhi Azadpur Mandi")
+    private String commodity;
+    private String state;
+    private String district;
+    private String market;
+    private String variety;
+    private String grade;
 
-    private double price;       // Price value
-    private String unit;        // e.g., "quintal", "kg"
+    private LocalDate arrivalDate;
+    private double minPrice;
+    private double maxPrice;
+    private double modalPrice;
 
-    private LocalDate priceDate;      // Date when this price is valid (from API)
-    
     @CreatedDate
-    private LocalDateTime createdAt;  // Timestamp when saved in DB
+    private LocalDateTime createdAt;
 
     @LastModifiedDate
-    private LocalDateTime updatedAt;  // Timestamp when record was last modified
-
-    private LocalDateTime lastUpdated; // Useful for cache validity checks (API fetch time)
+    private LocalDateTime updatedAt;
 }

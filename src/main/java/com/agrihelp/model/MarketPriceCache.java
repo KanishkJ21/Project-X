@@ -2,30 +2,33 @@ package com.agrihelp.model;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Document(collection = "market_price_cache")
-@Data
-@Builder
-@AllArgsConstructor
+@Getter
+@Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class MarketPriceCache {
 
     @Id
     private String id;
 
-    private String commodity;  // e.g., "Wheat", "Rice"
-    private String state;      // e.g., "Uttar Pradesh"
-    private String market;     // Specific mandi/market (e.g., "Azadpur Mandi")
+    private String commodity;
+    private String state;
+    private String district;
+    private String market;
+    private String variety;
 
-    private double price;
-    private String unit;       // e.g., "quintal", "kg"
-    private LocalDate priceDate;
+    private LocalDate arrivalDate;
 
-    @LastModifiedDate
-    private LocalDateTime lastUpdated; // for cache validity
+    private Double minPrice;
+    private Double maxPrice;
+    private Double modalPrice;
+
+    private LocalDateTime lastUpdated;
 }

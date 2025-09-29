@@ -11,10 +11,9 @@ public class User {
 
     private String username;
     private String email;
-    private String password; // Store hashed password
-
-    // Optional: user role (farmer, admin) — Spring Security requires ROLE_ prefix
+    private String password; // hashed password
     private String role = "ROLE_FARMER";
+    private Boolean approved = true; // only approved users can login
 
     public User() {}
 
@@ -27,23 +26,14 @@ public class User {
     // Getters & Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
-
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
-
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
-
     public String getRole() { return role; }
-    public void setRole(String role) { 
-        // Ensure prefix "ROLE_" for Spring Security
-        if (!role.startsWith("ROLE_")) {
-            this.role = "ROLE_" + role;
-        } else {
-            this.role = role;
-        }
-    }
+    public void setRole(String role) { this.role = role.startsWith("ROLE_") ? role : "ROLE_" + role; }
+    public Boolean getApproved() { return approved; }
+    public void setApproved(Boolean approved) { this.approved = approved; }
 }

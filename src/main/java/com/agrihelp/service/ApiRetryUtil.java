@@ -3,58 +3,29 @@ package com.agrihelp.service;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.function.Supplier;
-
 @Component
 public class ApiRetryUtil {
 
-    private static final int DEFAULT_MAX_RETRIES = 3;
-    private static final long DEFAULT_DELAY_MS = 1000; // 1 second
-
     /**
-     * Executes the supplier with retry logic using default retries and delay.
-     *
-     * @param supplier Function that makes the API call
-     * @param <T>      Return type
-     * @return Result from supplier
+     * Simple retry wrapper around RestTemplate.getForObject.
+     * Returns null only if all retries fail (caller should handle null).
      */
-    public <T> T executeWithRetry(Supplier<T> supplier) {
-        return executeWithRetry(supplier, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_MS);
-    }
+    public <T> T getForObjectWithRetry(RestTemplate restTemplate, String url, Class<T> responseType, Object... uriVariables) {
+        int retries = 3;
+        long delayMs = 1200L;
 
-    /**
-     * Executes supplier with configurable retries and delay.
-     *
-     * @param supplier   Function that makes the API call
-     * @param maxRetries Max number of retries
-     * @param delayMs    Delay between retries in milliseconds
-     * @param <T>        Return type
-     * @return Result from supplier
-     */
-    public <T> T executeWithRetry(Supplier<T> supplier, int maxRetries, long delayMs) {
-        int attempt = 0;
-        while (true) {
+        for (int i = 0; i < retries; i++) {
             try {
-                return supplier.get();
-            } catch (RuntimeException e) { // ✅ Catch only RuntimeException (includes RestClientException)
-                attempt++;
-                if (attempt > maxRetries) {
-                    throw e;
+                return restTemplate.getForObject(url, responseType, uriVariables);
+            } catch (Exception ex) {
+                if (i == retries - 1) {
+                    throw new RuntimeException("API request failed after retries: " + ex.getMessage(), ex);
                 }
                 try {
                     Thread.sleep(delayMs);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Thread interrupted during API retry", ie);
-                }
+                } catch (InterruptedException ignored) {}
             }
         }
-    }
-
-    /**
-     * Executes RestTemplate GET request with retry
-     */
-    public <T> T getForObjectWithRetry(RestTemplate restTemplate, String url, Class<T> responseType, Object... uriVariables) {
-        return executeWithRetry(() -> restTemplate.getForObject(url, responseType, uriVariables));
+        return null;
     }
 }

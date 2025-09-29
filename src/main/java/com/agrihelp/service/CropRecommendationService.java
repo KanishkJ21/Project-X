@@ -7,79 +7,78 @@ import com.agrihelp.repository.SoilDataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class CropRecommendationService {
 
     @Autowired
-    private CropRecommendationRepository cropRepository;
+    private CropRecommendationRepository cropRepo;
 
     @Autowired
-    private SoilDataRepository soilDataRepository;
+    private SoilDataRepository soilRepo;
 
-    /**
-     * Get crop recommendation based on field's soil data
-     */
-    public CropRecommendation getCropRecommendation(String fieldName) {
-        Optional<SoilData> soilOpt = soilDataRepository.findByFieldNameIgnoreCase(fieldName);
+    public CropRecommendation getRecommendation(String fieldName) {
+        Optional<SoilData> soilOpt = soilRepo.findByFieldNameIgnoreCase(fieldName);
 
         if (soilOpt.isPresent()) {
             SoilData soil = soilOpt.get();
 
-            // Find crops matching soil type and pH range
-            List<CropRecommendation> matches = cropRepository.findBySoilTypeIgnoreCaseAndPhBetween(
-                    soil.getSoilType(), soil.getPh() - 0.5, soil.getPh() + 0.5
-            );
+            // fetch all crops for soil type
+            List<CropRecommendation> allCrops = cropRepo.findBySoilTypeIgnoreCase(soil.getSoilType());
+
+            // filter by soil ranges
+            List<CropRecommendation> matches = new ArrayList<>();
+            for (CropRecommendation crop : allCrops) {
+                if (soil.getPh() >= crop.getMinPh() && soil.getPh() <= crop.getMaxPh() &&
+                        soil.getNitrogen() >= crop.getMinNitrogen() && soil.getNitrogen() <= crop.getMaxNitrogen() &&
+                        soil.getPhosphorus() >= crop.getMinPhosphorus() && soil.getPhosphorus() <= crop.getMaxPhosphorus()) {
+
+                    matches.add(crop);
+                }
+            }
 
             if (!matches.isEmpty()) {
                 CropRecommendation rec = matches.get(0);
                 rec.setBasedOnSoilData(true);
-                rec.setReason("Recommendation based on soil data from field: " + fieldName);
+                rec.setReason("Based on soil data for field: " + fieldName);
                 return rec;
             }
 
-            // If no match, fallback to region-based
-            return getGeneralCropRecommendationByRegion(soil.getRegion());
+            return getByRegion(soil.getRegion());
         }
 
-        // If no soil data available → fallback to general recommendation
-        return getGeneralCropRecommendationByRegion("Unknown");
+        // No soil data exists for this field
+        CropRecommendation noData = new CropRecommendation();
+        noData.setRecommendedCrop(null);
+        noData.setBasedOnSoilData(false);
+        noData.setReason("No soil data exists for field: " + fieldName);
+        return noData;
     }
 
-    /**
-     * Get general crop recommendation by region (approximate, if SHC skipped)
-     */
-    public CropRecommendation getGeneralCropRecommendationByRegion(String region) {
-        List<CropRecommendation> regionalCrops = cropRepository.findByRegionIgnoreCase(region);
+    // Region fallback
+    public CropRecommendation getByRegion(String region) {
+        List<CropRecommendation> list = cropRepo.findByRegionIgnoreCase(region);
 
-        if (!regionalCrops.isEmpty()) {
-            CropRecommendation rec = regionalCrops.get(0);
-            rec.setBasedOnSoilData(false); // mark as approximate
-            rec.setReason("General recommendation based on region/season.");
+        if (!list.isEmpty()) {
+            CropRecommendation rec = list.get(0);
+            rec.setBasedOnSoilData(false);
+            rec.setReason("General recommendation for region: " + region);
             return rec;
         }
 
-        // fallback: default crop
         return CropRecommendation.builder()
                 .recommendedCrop("Wheat")
-                .reason("Default crop recommendation for general use.")
+                .reason("Default fallback recommendation.")
                 .basedOnSoilData(false)
                 .build();
     }
 
-    /**
-     * Save a new crop recommendation (admin use)
-     */
-    public CropRecommendation saveCropRecommendation(CropRecommendation recommendation) {
-        return cropRepository.save(recommendation);
+    public CropRecommendation save(CropRecommendation recommendation) {
+        return cropRepo.save(recommendation);
     }
 
-    /**
-     * Get all crop recommendations (admin view)
-     */
-    public List<CropRecommendation> getAllCropRecommendations() {
-        return cropRepository.findAll();
+    public List<CropRecommendation> getAll() {
+        return cropRepo.findAll();
     }
 }

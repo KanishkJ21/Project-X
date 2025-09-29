@@ -9,32 +9,33 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/crops")
+@CrossOrigin(origins = "http://localhost:5173") // frontend origin
 public class CropRecommendationController {
 
     @Autowired
     private CropRecommendationService cropService;
 
-    // Get recommendation for a field (accurate if SHC exists)
+    /**
+     * Recommend crop by fieldName (uses soil data)
+     */
     @GetMapping("/recommend/{fieldName}")
-    public CropRecommendation getCropRecommendation(@PathVariable String fieldName) {
-        return cropService.getCropRecommendation(fieldName);
+    public CropRecommendation recommend(@PathVariable String fieldName) {
+        return cropService.getRecommendation(fieldName);
     }
 
-    // General recommendation by region (if SHC skipped)
+    /**
+     * Get region-based recommendation
+     */
     @GetMapping("/region/{region}")
     public CropRecommendation getByRegion(@PathVariable String region) {
-        return cropService.getGeneralCropRecommendationByRegion(region);
+        return cropService.getByRegion(region);
     }
 
-    // Admin: save crop recommendation
-    @PostMapping("/save")
-    public CropRecommendation saveCrop(@RequestBody CropRecommendation recommendation) {
-        return cropService.saveCropRecommendation(recommendation);
-    }
-
-    // Admin: view all
+    /**
+     * List all crop recommendations
+     */
     @GetMapping("/all")
-    public List<CropRecommendation> getAllCrops() {
-        return cropService.getAllCropRecommendations();
+    public List<CropRecommendation> getAll() {
+        return cropService.getAll();
     }
 }

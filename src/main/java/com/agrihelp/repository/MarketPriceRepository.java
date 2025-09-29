@@ -4,24 +4,21 @@ import com.agrihelp.model.MarketPrice;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface MarketPriceRepository extends MongoRepository<MarketPrice, String> {
 
-    // Find all prices for a crop (case-insensitive)
-    List<MarketPrice> findByCropNameIgnoreCase(String cropName);
+    List<MarketPrice> findByCommodityIgnoreCase(String commodity);
 
-    // Find all prices for a location (case-insensitive)
-    List<MarketPrice> findByLocationIgnoreCase(String location);
+    List<MarketPrice> findByStateIgnoreCase(String state);
 
-    // Find specific crop & location combination
-    List<MarketPrice> findByCropNameIgnoreCaseAndLocationIgnoreCase(String cropName, String location);
+    List<MarketPrice> findByCommodityIgnoreCaseAndStateIgnoreCase(String commodity, String state);
 
-    // Optional: Get the latest entry for a crop & location (sorted by lastUpdated descending)
-    Optional<MarketPrice> findTopByCropNameIgnoreCaseAndLocationIgnoreCaseOrderByLastUpdatedDesc(
-            String cropName,
-            String location
-    );
+    Optional<MarketPrice> findTopByCommodityIgnoreCaseAndStateIgnoreCaseOrderByArrivalDateDesc(
+            String commodity, String state);
+
+    List<MarketPrice> findByArrivalDate(LocalDate date);
 }

@@ -12,6 +12,13 @@ public class WeatherController {
     @Autowired
     private WeatherService weatherService;
 
+    @GetMapping("/ping")
+    public String ping() {
+        return "Backend is alive!";
+    }
+
+
+
     // Get weather by city name
     @GetMapping("/{city}")
     public WeatherData getWeather(@PathVariable String city) {
